@@ -29,7 +29,11 @@ wss.on('connection', (ws) => {
   clients.push(new Client(ws));
   console.log(`a user connected ${getClient(ws).id}`);
   players.push({id: getClient(ws).id, x: 0, y: 0, rotation: 0, team: Math.floor(Math.random() * 2) + 1});
-  ws.send(JSON.stringify({event: 'players', players: players, playerID: getClient(ws).id}));
+  wss.clients.forEach((client) => {
+    if (client !== ws && client.readyState === 1) {
+      client.send(JSON.stringify({event: 'players', players: players, playerID: getClient(client).id}));
+    }
+  });
 
   ws.on('message', (raw) => {
     try {
@@ -42,10 +46,7 @@ wss.on('connection', (ws) => {
       player.y = movementData.y;
       player.rotation = movementData.rotation;
       for(const client of clients) {
-        console.log(client.id)
         if (client.ws === ws && client.ws.readyState !== 1) continue;
-
-        console.log(client.id === getClient(ws).id);
         client.ws.send(JSON.stringify({event: 'move', player: player, playerID: client.id}));
       }
     } catch (error) {
