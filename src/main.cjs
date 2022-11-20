@@ -9,6 +9,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 var players = [];
+var clients = {};
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
@@ -17,6 +18,7 @@ app.get('/', (req, res) => {
 wss.on('connection', (ws) => {
   const playerID = generateUUID()
   console.log(`a user connected ${playerID}`);
+  clients[ws] = playerID;
   players.push({id: playerID, x: 0, y: 0, rotation: 0, team: Math.floor(Math.random() * 2) + 1});
   ws.send(JSON.stringify({event: 'players', players: players, playerID: playerID}));
 
@@ -30,7 +32,11 @@ wss.on('connection', (ws) => {
       player.x = movementData.x;
       player.y = movementData.y;
       player.rotation = movementData.rotation;
-      ws.send(JSON.stringify({event: 'move', player: player, playerID: playerID}));
+      wss.clients.forEach((client) => {
+        if (client !== ws && client.readyState === 1) {
+          client.send(JSON.stringify({event: 'move', player: player, playerID: clients[client]}));
+        }
+      });
     } catch (error) {
       console.error(error)
     }    
@@ -39,7 +45,7 @@ wss.on('connection', (ws) => {
   ws.on('disconnect', () => {
     console.log('a user disconnected');
     players = players.filter(player => player.id !== playerID);
-    ws.send(JSON.stringify({event: 'players', players: players, playerID: playerID}));
+    ws.send(JSON.stringify({event: 'players', players: players, playerID: clients[ws]}));
   });
 });
 
