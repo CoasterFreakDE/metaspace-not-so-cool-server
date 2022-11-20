@@ -30,7 +30,7 @@ wss.on('connection', (ws) => {
   console.log(`a user connected ${getClient(ws).id}`);
   players.push({id: getClient(ws).id, x: 0, y: 0, rotation: 0, team: Math.floor(Math.random() * 2) + 1});
   wss.clients.forEach((client) => {
-    if (client !== ws && client.readyState === 1) {
+    if (client.readyState === 1) {
       client.send(JSON.stringify({event: 'players', players: players, playerID: getClient(client).id}));
     }
   });
