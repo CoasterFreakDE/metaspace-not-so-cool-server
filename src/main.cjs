@@ -26,6 +26,8 @@ app.get('/', (req, res) => {
 });
 
 wss.on('connection', (ws) => {
+  ws.isAlive = true;
+
   clients.push(new Client(ws));
   console.log(`a user connected ${getClient(ws).id}`);
   players.push({id: getClient(ws).id, x: 0, y: 0, rotation: 0, team: Math.floor(Math.random() * 2) + 1});
@@ -39,16 +41,22 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(raw)
       const event = data.event;
-      if (event !== 'move') return;
-      const player = players.find(player => player.id === getClient(ws).id);
-      const movementData = data.player
-      player.x = movementData.x;
-      player.y = movementData.y;
-      player.rotation = movementData.rotation;
-      for(const client of clients) {
-        if (client.ws === ws && client.ws.readyState !== 1) continue;
-        client.ws.send(JSON.stringify({event: 'move', player: player, playerID: client.id}));
-      }
+      switch (event) {
+        case 'move':
+          const player = players.find(player => player.id === getClient(ws).id);
+          const movementData = data.player
+          player.x = movementData.x;
+          player.y = movementData.y;
+          player.rotation = movementData.rotation;
+          for(const client of clients) {
+            if (client.ws === ws && client.ws.readyState !== 1) continue;
+            client.ws.send(JSON.stringify({event: 'move', player: player, playerID: client.id}));
+          }
+          break;
+        case 'pong':
+          ws.isAlive = true;
+          break;
+        }
     } catch (error) {
       console.error(error)
     }    
@@ -64,6 +72,19 @@ wss.on('connection', (ws) => {
     });
 
   });
+});
+
+const interval = setInterval(function ping() {
+  wss.clients.forEach(function each(ws) {
+    if (ws.isAlive === false) return ws.terminate();
+
+    ws.isAlive = false;
+    ws.send(JSON.stringify({event: 'ping'}));
+  });
+}, 30000);
+
+wss.on('close', function close() {
+  clearInterval(interval);
 });
 
 server.listen(port, () => {
