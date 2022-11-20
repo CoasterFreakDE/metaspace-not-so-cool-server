@@ -21,21 +21,25 @@ wss.on('connection', (ws) => {
   ws.send(JSON.stringify({event: 'players', players: players, playerID: playerID}));
 
   ws.on('message', (raw) => {
-    const data = JSON.parse(raw.data)
-    const event = data.event;
-    if (event !== 'move') return;
-    const player = players.find(player => player.id === playerID);
-    const movementData = data.player
-    player.x = movementData.x;
-    player.y = movementData.y;
-    player.rotation = movementData.rotation;
-    ws.send(JSON.stringify({event: 'move', player: player}));
+    try {
+      const data = JSON.parse(raw)
+      const event = data.event;
+      if (event !== 'move') return;
+      const player = players.find(player => player.id === playerID);
+      const movementData = data.player
+      player.x = movementData.x;
+      player.y = movementData.y;
+      player.rotation = movementData.rotation;
+      ws.send(JSON.stringify({event: 'move', player: player, playerID: playerID}));
+    } catch (error) {
+      console.error(error)
+    }    
   });
 
   ws.on('disconnect', () => {
     console.log('a user disconnected');
     players = players.filter(player => player.id !== playerID);
-    ws.send(JSON.stringify({event: 'players', players: players}));
+    ws.send(JSON.stringify({event: 'players', players: players, playerID: playerID}));
   });
 });
 
