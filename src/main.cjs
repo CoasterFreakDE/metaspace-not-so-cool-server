@@ -20,6 +20,10 @@ class Client {
 
 var players = [];
 var clients = [];
+var commands = [
+  "/rename <name>",
+]
+
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
@@ -30,7 +34,7 @@ wss.on('connection', (ws) => {
 
   clients.push(new Client(ws));
   console.log(`a user connected ${getClient(ws).id}`);
-  players.push({id: getClient(ws).id, x: 0, y: 0, rotation: 0, team: Math.floor(Math.random() * 2) + 1});
+  players.push({id: getClient(ws).id, name: getClient(ws).id, x: 0, y: 0, rotation: 0, team: Math.floor(Math.random() * 2) + 1});
   wss.clients.forEach((client) => {
     if (client.readyState === 1) {
       client.send(JSON.stringify({event: 'players', players: players, playerID: getClient(client).id}));
@@ -55,6 +59,22 @@ wss.on('connection', (ws) => {
           break;
         case 'pong':
           ws.isAlive = true;
+          break;
+        case 'commands':
+          ws.send(JSON.stringify({event: 'commands', commands: commands}));
+          break;
+        case 'console':
+          console.log(data.command);
+          if(!data.command) break;
+          if(data.command.startsWith('/rename ')) {
+            const newName = data.command.split(' ')[1];
+            const player = players.find(player => player.id === getClient(ws).id);
+            player.name = newName;
+            for(const client of clients) {
+              if (client.ws === ws && client.ws.readyState !== 1) continue;
+              client.ws.send(JSON.stringify({event: 'rename', player: player, playerID: client.id}));
+            }
+          }
           break;
         }
     } catch (error) {
