@@ -7,6 +7,7 @@ const http = require('http');
 const WebSocketServer = require('ws').Server;
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+var Vec2D = require('vector2d');
 
 class Client {
   constructor(ws) {
@@ -24,6 +25,34 @@ var commands = [
   "/rename <name>",
 ]
 
+var planets = [];
+
+function generateFirst() {
+    planets.push({
+        id: 'spawn',
+        origin: new Vec2D.Vector(50, 50),
+        position: new Vec2D.Vector(50, 50),
+        radius: 100,
+        mass: 100,
+        imageId: 0
+    });
+}
+
+function generatePlanet(posX, posY) {
+  var planet = {
+    id: generateUUID(),
+    origin: new Vec2D.Vector(posX, posY),
+    position: new Vec2D.Vector(posX, posY),
+    radius: Math.random() * 500,
+    mass: Math.random() * 100,
+    imageId: Math.floor(Math.random() * 9)
+  };
+  planets.push(planet);
+  console.log("Generated planet: " + planet.id + " at " + planet.position.x + ", " + planet.position.y);
+}
+
+generateFirst();
+
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
@@ -33,8 +62,8 @@ wss.on('connection', (ws) => {
   ws.isAlive = true;
 
   clients.push(new Client(ws));
-  console.log(`a user connected ${getClient(ws).id}`);
-  players.push({id: getClient(ws).id, name: getClient(ws).id, x: 0, y: 0, rotation: 0, team: Math.floor(Math.random() * 2) + 1});
+  console.log(`a user connected ${getClient(ws).id} from ${ws._socket.remoteAddress}`);
+  players.push({id: getClient(ws).id, name: getClient(ws).id, x: 0, y: 0, rotation: 0, team: Math.floor(Math.random() * 2) + 1, planets_nearby: []});
   wss.clients.forEach((client) => {
     if (client.readyState === 1) {
       client.send(JSON.stringify({event: 'players', players: players, playerID: getClient(client).id}));
@@ -45,18 +74,47 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(raw)
       const event = data.event;
+      const player = players.find(player => player.id === getClient(ws).id);
       switch (event) {
         case 'move':
-          const player = players.find(player => player.id === getClient(ws).id);
           const movementData = data.player
           player.x = movementData.x;
           player.y = movementData.y;
           player.rotation = movementData.rotation;
+          var planets_nearby = planets.filter(planet => {
+            // Only get planets within 1000 units of the player
+            var distance = Math.sqrt(Math.pow(planet.position.x - player.x, 2) + Math.pow(planet.position.y - player.y, 2));
+            return distance < 2000;
+          });
+          player.planets_nearby = planets_nearby;
           for(const client of clients) {
             if (client.ws === ws && client.ws.readyState !== 1) continue;
             client.ws.send(JSON.stringify({event: 'move', player: player, playerID: client.id}));
           }
           break;
+        case 'world':
+          var planets_nearby = planets.filter(planet => {
+            // Only get planets within 1000 units of the player
+            var distance = Math.sqrt(Math.pow(planet.position.x - player.x, 2) + Math.pow(planet.position.y - player.y, 2));
+            return distance < 2000;
+          });
+          player.planets_nearby = planets_nearby;
+          ws.send(JSON.stringify({event: 'world', planets: planets_nearby, playerID: player.id}));
+          break;
+        case 'new_planet':
+            generatePlanet(player.x, player.y);
+            for(const client of clients) {
+              if (client.ws === ws && client.ws.readyState !== 1) continue;
+              var client_player = players.find(player => player.id === client.id);
+              var planets_nearby = planets.filter(planet => {
+                // Only get planets within 1000 units of the player
+                var distance = Math.sqrt(Math.pow(planet.position.x - client_player.x, 2) + Math.pow(planet.position.y - client_player.y, 2));
+                return distance < 2000;
+              });
+              client_player.planets_nearby = planets_nearby;
+              client.ws.send(JSON.stringify({event: 'world', planets: planets_nearby, playerID: client_player.id}));
+            }
+            break;
         case 'pong':
           ws.isAlive = true;
           break;
