@@ -74,6 +74,16 @@ wss.on('connection', (ws) => {
               if (client.ws === ws && client.ws.readyState !== 1) continue;
               client.ws.send(JSON.stringify({event: 'rename', player: player, playerID: client.id}));
             }
+          } else {
+            if(data.command.startsWith('/')) {
+              ws.send(JSON.stringify({event: 'console', message: 'Unknown command'}));
+            } else {
+              const player = players.find(player => player.id === getClient(ws).id);
+              for(const client of clients) {
+                if (client.ws === ws && client.ws.readyState !== 1) continue;
+                client.ws.send(JSON.stringify({event: 'chat', message: data.command, player: player, playerID: client.id}));
+              }
+            }
           }
           break;
         }
