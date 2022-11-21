@@ -106,13 +106,15 @@ wss.on('connection', (ws) => {
             for(const client of clients) {
               if (client.ws === ws && client.ws.readyState !== 1) continue;
               var client_player = players.find(player => player.id === client.id);
-              var planets_nearby = planets.filter(planet => {
-                // Only get planets within 1000 units of the player
-                var distance = Math.sqrt(Math.pow(planet.position.x - client_player.x, 2) + Math.pow(planet.position.y - client_player.y, 2));
-                return distance < 2000;
-              });
-              client_player.planets_nearby = planets_nearby;
-              client.ws.send(JSON.stringify({event: 'world', planets: planets_nearby, playerID: client_player.id}));
+              if(client_player) {
+                var planets_nearby = planets.filter(planet => {
+                  // Only get planets within 1000 units of the player
+                  var distance = Math.sqrt(Math.pow(planet.position.x - client_player.x, 2) + Math.pow(planet.position.y - client_player.y, 2));
+                  return distance < 2000;
+                });
+                client_player.planets_nearby = planets_nearby;
+                client.ws.send(JSON.stringify({event: 'world', planets: planets_nearby, playerID: client_player.id}));
+              }
             }
             break;
         case 'pong':
